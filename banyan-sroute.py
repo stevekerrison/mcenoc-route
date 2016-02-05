@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
     Banyan Static Router
 
@@ -7,12 +7,13 @@
     require the same destination, a valid non-blocking route is guaranteed.
 
 Usage:
-    banyan-sroute.py (-h | --help)
+    banyan-sroute.py -h
     banyan-sroute.py [-n=<n>] [-s=<s>] [<src--dst>...]
 
 Options:
-    -n=<n>, --numports=<n>      The number of ports in the system [default: 8]
-    -s=<s>, --midswitches=<s>   The number of middle-stage switches [default: 4]
+    -h, --help                  Print this help message.
+    -n=<n>, --numports=<n>      The num of ports in the system [default: 8]
+    -s=<s>, --midswitches=<s>   The num of middle-stage switches [default: 4]
 
 Arguments:
     <src--dst>  Source and node IDs (up to numports instances). No repeated
@@ -22,7 +23,34 @@ Arguments:
 
 from docopt import docopt
 
+
+class BSRoute:
+    """
+        Static route generator for Banyan-style networks.
+    """
+
+    def __init__(self, n, s, r):
+        try:
+            self.n = int(n, 0)
+            self.s = int(n, 0)
+            src, dst = [list(l) for l in zip(*[x.split('--') for x in r])]
+            self.src = list(map(lambda i: int(i, 0), src))
+            self.dst = list(map(lambda i: int(i, 0), dst))
+        except ValueError:
+            raise
+        self.dupecheck(self.src)
+        self.dupecheck(self.dst)
+        print (self.src)
+
+    def dupecheck(self, l):
+        seen = set()
+        dupes = set(x for x in l if x in seen or seen.add(x))
+        if len(dupes) > 0:
+            raise ValueError('Duplicate value(s): {}'.format(list(dupes)))
+        return
+
+
 if __name__ == "__main__":
     ARGS = docopt(__doc__, version="Banyan Static Router v0.0")
-    print ARGS
-
+    BSR = BSRoute(ARGS['--numports'], ARGS['--midswitches'],
+                  ARGS['<src--dst>'])
