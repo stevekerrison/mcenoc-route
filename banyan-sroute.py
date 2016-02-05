@@ -33,14 +33,18 @@ class BSRoute:
         try:
             self.n = int(n, 0)
             self.s = int(n, 0)
-            src, dst = [list(l) for l in zip(*[x.split('--') for x in r])]
-            self.src = list(map(lambda i: int(i, 0), src))
-            self.dst = list(map(lambda i: int(i, 0), dst))
+            self.src = []
+            self.dst = []
+            if len(r) > 0:
+                src, dst = [list(l) for l in zip(*[x.split('--') for x in r])]
+                self.src = list(map(lambda i: int(i, 0), src))
+                self.dst = list(map(lambda i: int(i, 0), dst))
+            else:
+                self.randroute()
         except ValueError:
             raise
         self.dupecheck(self.src)
         self.dupecheck(self.dst)
-        print (self.src)
 
     def dupecheck(self, l):
         seen = set()
@@ -49,8 +53,15 @@ class BSRoute:
             raise ValueError('Duplicate value(s): {}'.format(list(dupes)))
         return
 
+    def randroute(self):
+        raise NotImplementedError
+
+    def gen(self):
+        raise NotImplementedError
+
 
 if __name__ == "__main__":
     ARGS = docopt(__doc__, version="Banyan Static Router v0.0")
     BSR = BSRoute(ARGS['--numports'], ARGS['--midswitches'],
                   ARGS['<src--dst>'])
+    BSR.gen()
