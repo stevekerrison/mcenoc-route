@@ -28,7 +28,7 @@ import pyeda.util as eda
 
 
 class BSwitch:
-    def __init__(self, nports, conns):
+    def __init__(self, nports):
         self.nports = nports
         self.conns = {x: True for x in conns}
 
@@ -43,6 +43,29 @@ class BNet:
         nswitches = int(math.ceil(nports / nswp))
         mswitches = int(math.ceil(nports / mswp))
         print (nports, stages, nbits, mbits, nswitches, mswitches)
+        for s in range(int((stages-1)/2)):
+            for p in range(nports):
+                pstep = nswp**2
+                if pstep > nports:
+                    step = nports
+                else:
+                    step = pstep
+                pmap = (p % step) * nswp
+                wrapc = pmap / step
+                pmod = (pmap % step) + wrapc
+                blockoff = int(math.floor(p/step) * step)
+                fport = pmod + blockoff
+                if s == 0:
+                    # Mid connections
+                    aswitch = int(p / mswp)
+                    aport = p % mswp
+                    bswitch = int(fport / nswp)
+                    bport = fport % nswp
+                    if aport == 0:
+                        sw = BSwitch(mswp)
+                else:
+                    # Other connections
+                    pass
         raise NotImplementedError
 
 
