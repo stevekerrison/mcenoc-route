@@ -22,6 +22,7 @@ Arguments:
 """
 
 from docopt import docopt
+import random
 
 
 class BSRoute:
@@ -51,13 +52,12 @@ class BSRoute:
     def rangeraise(self, v):
         raise ValueError("Value {} outside node range".format(v))
 
-
     def rangecheck(self, l):
         if max(l) >= self.n:
             self.rangeraise(max(l))
         if min(l) < 0:
             self.rangeraise(min(l))
-    
+
     def dupecheck(self, l):
         seen = set()
         dupes = set(x for x in l if x in seen or seen.add(x))
@@ -66,7 +66,8 @@ class BSRoute:
         return
 
     def randroute(self):
-        raise NotImplementedError
+        self.src = random.sample(range(self.n), self.n)
+        self.dst = random.sample(range(self.n), self.n)
 
     def gen(self):
         raise NotImplementedError
