@@ -8,12 +8,12 @@
 
 Usage:
     banyan-sroute.py -h
-    banyan-sroute.py [-n=<n>] [-s=<s>] [<src--dst>...]
+    banyan-sroute.py [-n=<n>] [-b=<b>] [<src--dst>...]
 
 Options:
-    -h, --help                  Print this help message.
-    -n=<n>, --numports=<n>      The num of ports in the system [default: 8]
-    -s=<s>, --midswitches=<s>   The num of middle-stage switches [default: 4]
+    -h, --help                      Print this help message.
+    -n=<n>, --numports=<n>          The num of ports in the system [default: 8]
+    -b=<b>, --bitsperswitch=<b>     The num of bits per switch [default: 1]
 
 Arguments:
     <src--dst>  Source and node IDs (up to numports instances). No repeated
@@ -23,6 +23,27 @@ Arguments:
 
 from docopt import docopt
 import random
+import math
+import pyeda.util as eda
+
+
+class BSwitch:
+    def __init__(self, nports, conns):
+        self.nports = nports
+        self.conns = {x: True for x in conns}
+
+
+class BNet:
+    def __init__(self, nports, stages, nbits, mbits):
+        self.stages = stages
+        self.nbits = nbits
+        self.mbits = mbits
+        nswp = 2**nbits
+        mswp = 2**mbits
+        nswitches = int(math.ceil(nports / nswp))
+        mswitches = int(math.ceil(nports / mswp))
+        print (nports, stages, nbits, mbits, nswitches, mswitches)
+        raise NotImplementedError
 
 
 class BSRoute:
@@ -30,20 +51,17 @@ class BSRoute:
         Static route generator for Banyan-style networks.
     """
 
-    def __init__(self, n, s, r):
-        try:
-            self.n = int(n, 0)
-            self.s = int(n, 0)
-            self.src = []
-            self.dst = []
-            if len(r) > 0:
-                src, dst = [list(l) for l in zip(*[x.split('--') for x in r])]
-                self.src = list(map(lambda i: int(i, 0), src))
-                self.dst = list(map(lambda i: int(i, 0), dst))
-            else:
-                self.randroute()
-        except ValueError:
-            raise
+    def __init__(self, n, b, r):
+        self.n = int(n)
+        self.b = int(b)
+        self.src = []
+        self.dst = []
+        if len(r) > 0:
+            src, dst = [list(l) for l in zip(*[x.split('--') for x in r])]
+            self.src = list(map(lambda i: int(i, 0), src))
+            self.dst = list(map(lambda i: int(i, 0), dst))
+        else:
+            self.randroute()
         self.dupecheck(self.src)
         self.dupecheck(self.dst)
         self.rangecheck(self.src)
@@ -69,12 +87,24 @@ class BSRoute:
         self.src = random.sample(range(self.n), self.n)
         self.dst = random.sample(range(self.n), self.n)
 
+    def calcbits(self):
+        self.dirbits = eda.clog2(self.n)
+        self.stages = 2*int(math.floor(self.dirbits / self.b))
+        if self.dirbits % self.b:
+            self.midbits = self.dirbits % self.b
+            self.stages += 1
+        else:
+            self.midbits = self.b
+            self.stages -= 1
+
     def gen(self):
+        self.calcbits()
+        self.net = BNet(self.n, self.stages, self.b, self.midbits)
         raise NotImplementedError
 
 
 if __name__ == "__main__":
     ARGS = docopt(__doc__, version="Banyan Static Router v0.0")
-    BSR = BSRoute(ARGS['--numports'], ARGS['--midswitches'],
+    BSR = BSRoute(ARGS['--numports'], ARGS['--bitsperswitch'],
                   ARGS['<src--dst>'])
     BSR.gen()
