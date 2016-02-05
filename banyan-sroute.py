@@ -45,7 +45,19 @@ class BSRoute:
             raise
         self.dupecheck(self.src)
         self.dupecheck(self.dst)
+        self.rangecheck(self.src)
+        self.rangecheck(self.dst)
 
+    def rangeraise(self, v):
+        raise ValueError("Value {} outside node range".format(v))
+
+
+    def rangecheck(self, l):
+        if max(l) >= self.n:
+            self.rangeraise(max(l))
+        if min(l) < 0:
+            self.rangeraise(min(l))
+    
     def dupecheck(self, l):
         seen = set()
         dupes = set(x for x in l if x in seen or seen.add(x))
