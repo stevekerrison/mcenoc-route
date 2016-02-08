@@ -26,7 +26,6 @@ from docopt import docopt
 import random
 import parse
 import math
-import pyeda.util as eda
 
 
 class BSRoute:
@@ -91,7 +90,7 @@ class BSRoute:
         fmt = "{{:0{:d}b}}".format(self.rbits)
         print (hbits, nsw, fmt)
         print ("Routes:")
-        for i,r in enumerate(self.routesort):
+        for i, r in enumerate(self.routesort):
             if i % nsw == 0:
                 sw = 0
             print (i, r, fmt.format((sw << (hbits + 1)) | i))
