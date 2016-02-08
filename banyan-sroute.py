@@ -26,24 +26,27 @@ from docopt import docopt
 import random
 import parse
 import math
+import networkx as nx
 
 
-class BSRoute:
+class BSRoute(nx.DiGraph):
     """
         Static route generator for Banyan-style networks.
     """
 
     def __init__(self, net, route):
+        super(BSRoute, self).__init__()
         netfile = open(net, 'r')
         pr = parse.parse(r"\node[BP={:d}, BN={:d}, BM={:d}, BL={:d}{}",
                          netfile.readline().strip())
-        netfile.close()
         self.nports = pr[0]
         self.nbits = int(math.log2(pr[1]))
         self.mbits = int(math.log2(pr[2]))
         self.stages = pr[3]
         self.rbits = self.stages*self.nbits*2 + self.mbits
-        print (self.nports, self.nbits, self.mbits)
+        self.buildgraph(netfile)
+        netfile.close()
+        # print (self.nports, self.nbits, self.mbits)
         self.src = []
         self.dst = []
         if len(route) > 0:
@@ -56,6 +59,41 @@ class BSRoute:
         self.dupecheck(self.dst)
         self.rangecheck(self.src)
         self.rangecheck(self.dst)
+        return
+
+    def buildgraph(self, netfile):
+        cp = parse.compile(
+            r"\draw(r{:d}-{:d}-{:w}-{:d})--(r{:d}-{:d}-{:w}-{:d}{}")
+        l = netfile.readline().strip()
+        while l:
+            pr = [x for x in cp.parse(l)][:8]
+            fromkey = "L{:d}-S{:d}".format(*map(lambda x: x-1, pr[:2]))
+            fromport = pr[3]-1
+            tokey = "L{:d}-S{:d}".format(*map(lambda x: x-1, pr[4:6]))
+            toport = pr[7]-1
+            if pr[2] == 'input':
+                fromkey, tokey = tokey, fromkey
+                fromport, toport = toport, fromport
+            self.add_node(fromkey)
+            self.add_node(tokey)
+            self.add_edge(fromkey, tokey, {'srcp': fromport, 'dstp': toport})
+            l = netfile.readline().strip()
+        switch = 0
+        port = 0
+        nports = 2**self.nbits
+        for i in range(self.nports):
+            srckey = "N{:d}-src".format(i)
+            dstkey = "N{:d}-dst".format(i)
+            self.add_node(srckey, {'id': i})
+            self.add_node(dstkey, {'id': i})
+            swtokey = "L{:d}-S{:d}".format(0, switch)
+            swfromkey = "L{:d}-S{:d}".format(self.stages*2, switch)
+            self.add_edge(srckey, swtokey, {'dstp': port})
+            self.add_edge(swfromkey, dstkey, {'srcp': port})
+            port += 1
+            if port == nports:
+                switch += 1
+                port = 0
         return
 
     def rangeraise(self, v):
@@ -78,28 +116,50 @@ class BSRoute:
         self.src = random.sample(range(self.nports), self.nports)
         self.dst = random.sample(range(self.nports), self.nports)
 
+    def descendant_endpoints(self, src):
+        return set([self.node[x]['id']
+                for x in nx.descendants(self, src) if x[0] == 'N'])
+
     def gen(self):
-        self.routes = zip(self.src, self.dst)
-        self.routesort = map(lambda x: x[0],
-                             sorted(self.routes, key=lambda x: x[1]))
-        self.routeout = []
-        sw = 0
-        hbits = int((self.rbits-1)/2)
+        self.routesrc = {a: b for a, b in zip(self.src, self.dst)}
+        self.routedst = {b: a for a, b in self.routesrc.items()}
+        self.routeout = {}
         nsw = int(self.nports / 2**self.mbits)
-        swskip = int(nsw / (2**self.mbits))
-        fmt = "{{:0{:d}b}}".format(self.rbits)
-        print (hbits, nsw, fmt)
-        print ("Routes:")
-        for i, r in enumerate(self.routesort):
-            if i % nsw == 0:
-                sw = 0
-            print (i, r, fmt.format((sw << (hbits + 1)) | i))
-            # sw = sw + swskip
-            # if sw > nsw:
-            #     sw = int((sw + 1) % nsw)
-            sw += swskip
-            if sw >= nsw:
-                sw = ((sw + 1) % nsw)
+        swk = "L{:d}-S{{:d}}".format(self.stages)
+        sw = 0
+        while len(self.routeout) != self.nports:
+            sw = (sw + 1) % nsw
+            mid = swk.format(sw)
+            routable = self.descendant_endpoints(mid)
+            isec = routable.intersection(self.routedst.keys())
+            spath = None
+            for dst in isec:
+                src = self.routedst[dst]
+                skey = "N{:d}-src".format(src)
+                try:
+                    spath = nx.shortest_path(self, skey, mid)
+                except nx.exception.NetworkXNoPath:
+                    continue
+                break
+            if spath is None:
+                raise KeyError(spath, "Invalid path {}".format(spath))
+            print ("Route found from {:d}--{:d}".format(src,dst))
+            dkey = "N{:d}-dst".format(dst)
+            dpath = nx.shortest_path(self, mid, dkey)
+            path = spath + dpath[1:]
+            routebits = 0
+            for i in range(2,len(path)):
+                if i == self.stages:
+                    bitshift = self.mbits
+                else:
+                    bitshift = self.nbits
+                routebits <<= bitshift
+                routebits |= self.edge[path[i-1]][path[i]]['srcp']
+                self.remove_edge(path[i-1], path[i])
+            self.routeout[src] = routebits
+            print (src, dst, "{:05b}".format(routebits))
+            del self.routesrc[src]
+            del self.routedst[dst]
 
 
 if __name__ == "__main__":
