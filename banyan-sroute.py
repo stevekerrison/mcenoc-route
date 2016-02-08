@@ -40,8 +40,8 @@ class BSRoute(nx.DiGraph):
         pr = parse.parse(r"\node[BP={:d}, BN={:d}, BM={:d}, BL={:d}{}",
                          netfile.readline().strip())
         self.nports = pr[0]
-        self.nbits = int(math.log2(pr[1]))
-        self.mbits = int(math.log2(pr[2]))
+        self.nbits = int(math.log(pr[1], 2))
+        self.mbits = int(math.log(pr[2], 2))
         self.stages = pr[3]
         self.rbits = self.stages*self.nbits*2 + self.mbits
         self.buildgraph(netfile)
@@ -117,8 +117,8 @@ class BSRoute(nx.DiGraph):
         self.dst = random.sample(range(self.nports), self.nports)
 
     def descendant_endpoints(self, src):
-        return set([self.node[x]['id']
-                for x in nx.descendants(self, src) if x[0] == 'N'])
+        return set([self.node[x]['id'] for x in nx.descendants(self, src) if
+                    x[0] == 'N'])
 
     def gen(self):
         self.routesrc = {a: b for a, b in zip(self.src, self.dst)}
@@ -127,7 +127,8 @@ class BSRoute(nx.DiGraph):
         nsw = int(self.nports / 2**self.mbits)
         swk = "L{:d}-S{{:d}}".format(self.stages)
         sw = 0
-        while len(self.routeout) != self.nports:
+        target = self.nports
+        while len(self.routeout) != target:
             sw = (sw + 1) % nsw
             mid = swk.format(sw)
             routable = self.descendant_endpoints(mid)
@@ -142,13 +143,15 @@ class BSRoute(nx.DiGraph):
                     continue
                 break
             if spath is None:
+                target -= 1
+                continue
                 raise KeyError(spath, "Invalid path {}".format(spath))
-            print ("Route found from {:d}--{:d}".format(src,dst))
+            # print ("Route found from {:d}--{:d}".format(src,dst))
             dkey = "N{:d}-dst".format(dst)
             dpath = nx.shortest_path(self, mid, dkey)
             path = spath + dpath[1:]
             routebits = 0
-            for i in range(2,len(path)):
+            for i in range(2, len(path)):
                 if i == self.stages:
                     bitshift = self.mbits
                 else:
@@ -157,9 +160,12 @@ class BSRoute(nx.DiGraph):
                 routebits |= self.edge[path[i-1]][path[i]]['srcp']
                 self.remove_edge(path[i-1], path[i])
             self.routeout[src] = routebits
-            print (src, dst, "{:05b}".format(routebits))
+            # print (src, dst, "{:05b}".format(routebits))
             del self.routesrc[src]
             del self.routedst[dst]
+        print ("Routed {:d}/{:d} ({:.2f}%) connections".format(
+            len(self.routeout), self.nports,
+            float(len(self.routeout))/self.nports * 100))
 
 
 if __name__ == "__main__":
