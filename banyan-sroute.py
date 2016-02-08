@@ -76,7 +76,10 @@ class BSRoute(nx.DiGraph):
                 fromport, toport = toport, fromport
             self.add_node(fromkey)
             self.add_node(tokey)
-            self.add_edge(fromkey, tokey, {'srcp': fromport, 'dstp': toport})
+            self.add_edge(fromkey, tokey, {'srcp': fromport,
+                                           'dstp': toport,
+                                           'weight': 1,
+                                           'usedby': None})
             l = netfile.readline().strip()
         switch = 0
         port = 0
@@ -89,7 +92,9 @@ class BSRoute(nx.DiGraph):
             swtokey = "L{:d}-S{:d}".format(0, switch)
             swfromkey = "L{:d}-S{:d}".format(self.stages*2, switch)
             self.add_edge(srckey, swtokey, {'dstp': port})
-            self.add_edge(swfromkey, dstkey, {'srcp': port})
+            self.add_edge(swfromkey, dstkey, {'srcp': port,
+                                              'weight': 1,
+                                              'usedby': None})
             port += 1
             if port == nports:
                 switch += 1
@@ -118,49 +123,61 @@ class BSRoute(nx.DiGraph):
 
     def descendant_endpoints(self, src):
         return set([self.node[x]['id']
-                for x in nx.descendants(self, src) if x[0] == 'N'])
+                   for x in nx.descendants(self, src) if x[0] == 'N'])
+
+    def erasepath(self, src, path):
+        for i in range(2, len(path)):
+            e = self.edge[path[i-1]][path[i]]
+            e['weight'] -= 1
+            if e['usedby'] == src:
+                e['usedby'] = None
+
+    def checkroutes(self):
+        """
+            Goes over a list of paths and ensures validity
+        """
+        for src, route in self.routeout.items():
+            r = route[2]
+            for i in range(2, len(r)):
+                e = self.edge[r[i-1]][r[i]]
+                if e['usedby'] != src:
+                    raise ValueError("{}--{} owned by {:d}, not {:d}".format(
+                        r[i-1], r[i], e['usedby'], src))
+
+    def findroute(self, src, dst, replace=False):
+        skey = "N{:d}-src".format(src)
+        dkey = "N{:d}-dst".format(dst)
+        paths = random.choice(list(nx.all_shortest_paths(self, skey, dkey,
+                                                         weight='weight')))
+        path = nx.shortest_path(self, skey, dkey, weight='weight')
+        if replace:
+            self.erasepath(src, self.routeout[src][2])
+        routebits = 0
+        stolen = []
+        for i in range(2, len(path)):
+            if i == self.stages:
+                bitshift = self.mbits
+            else:
+                bitshift = self.nbits
+            routebits <<= bitshift
+            e = self.edge[path[i-1]][path[i]]
+            routebits |= e['srcp']
+            if e['usedby'] is not None:
+                stolen.append(e['usedby'])
+            e['weight'] += 1
+            e['usedby'] = src
+        self.routeout[src] = (dst, routebits, path)
+        print (src, dst, "{:05b}".format(routebits), path, stolen)
+        for s in stolen:
+            self.findroute(s, self.routeout[s][0], True)
 
     def gen(self):
-        self.routesrc = {a: b for a, b in zip(self.src, self.dst)}
-        self.routedst = {b: a for a, b in self.routesrc.items()}
+        self.route = sorted(zip(self.src, self.dst), key=lambda x: x[0])
         self.routeout = {}
-        nsw = int(self.nports / 2**self.mbits)
-        swk = "L{:d}-S{{:d}}".format(self.stages)
-        sw = 0
-        while len(self.routeout) != self.nports:
-            sw = (sw + 1) % nsw
-            mid = swk.format(sw)
-            routable = self.descendant_endpoints(mid)
-            isec = routable.intersection(self.routedst.keys())
-            spath = None
-            for dst in isec:
-                src = self.routedst[dst]
-                skey = "N{:d}-src".format(src)
-                try:
-                    spath = nx.shortest_path(self, skey, mid)
-                except nx.exception.NetworkXNoPath:
-                    continue
-                break
-            if spath is None:
-                raise KeyError(spath, "Invalid path {}".format(spath))
-            print ("Route found from {:d}--{:d}".format(src,dst))
-            dkey = "N{:d}-dst".format(dst)
-            dpath = nx.shortest_path(self, mid, dkey)
-            path = spath + dpath[1:]
-            routebits = 0
-            for i in range(2,len(path)):
-                if i == self.stages:
-                    bitshift = self.mbits
-                else:
-                    bitshift = self.nbits
-                routebits <<= bitshift
-                routebits |= self.edge[path[i-1]][path[i]]['srcp']
-                self.remove_edge(path[i-1], path[i])
-            self.routeout[src] = routebits
-            print (src, dst, "{:05b}".format(routebits))
-            del self.routesrc[src]
-            del self.routedst[dst]
-
+        # nsw = int(self.nports / 2**self.mbits)
+        for src, dst in self.route:
+            self.findroute(src, dst)
+        self.checkroutes()
 
 if __name__ == "__main__":
     ARGS = docopt(__doc__, version="Banyan Static Router v0.0")
