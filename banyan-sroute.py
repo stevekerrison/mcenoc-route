@@ -144,19 +144,12 @@ class BSRoute(nx.DiGraph):
                     raise ValueError("{}--{} owned by {:d}, not {:d}".format(
                         r[i-1], r[i], e['usedby'], src))
 
-    def erasegraph(self):
-        for i in self.edges_iter():
-            e = self.edge[i[0]][i[1]]
-            if 'weight' in e:
-                e['weight'] = 1
-            if 'usedby' in e:
-                e['usedby'] = None
-
     def findroute(self, src, dst, replace=False):
         skey = "N{:d}-src".format(src)
         dkey = "N{:d}-dst".format(dst)
-        path = random.choice(list(nx.all_shortest_paths(self, skey, dkey,
-                                                        weight='weight')))
+        paths = random.choice(list(nx.all_shortest_paths(self, skey, dkey,
+                                                         weight='weight')))
+        path = nx.shortest_path(self, skey, dkey, weight='weight')
         if replace:
             self.erasepath(src, self.routeout[src][2])
         routebits = 0
@@ -173,30 +166,17 @@ class BSRoute(nx.DiGraph):
                 stolen.append(e['usedby'])
             e['weight'] += 1
             e['usedby'] = src
-        if len(stolen) > 1:
-            self.erasegraph()
-            return False
-            raise NotImplementedError   # Don't know how to deal with this
         self.routeout[src] = (dst, routebits, path)
-        # print (src, dst, "{:05b}".format(routebits), path, stolen)
+        print (src, dst, "{:05b}".format(routebits), path, stolen)
         for s in stolen:
-            if replace:
-                self.erasegraph()
-                return False
-            return self.findroute(s, self.routeout[s][0], True)
-        return True
+            self.findroute(s, self.routeout[s][0], True)
 
     def gen(self):
         self.route = sorted(zip(self.src, self.dst), key=lambda x: x[0])
         self.routeout = {}
         # nsw = int(self.nports / 2**self.mbits)
-        while len(self.routeout) != self.nports:
-            for src, dst in self.route:
-                result = self.findroute(src, dst)
-                if not result:
-                    self.routeout = {}
-                    print('---')
-                    break
+        for src, dst in self.route:
+            self.findroute(src, dst)
         self.checkroutes()
 
 if __name__ == "__main__":
