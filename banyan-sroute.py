@@ -27,6 +27,30 @@ import random
 import parse
 import math
 import networkx as nx
+import numpy as np
+
+
+class BSPMat():
+
+    def __init__(self, size):
+        self.size = size
+        self.data = [[None for x in range(size)] for y in range(size)]
+
+    def preseed(self, routes):
+        for src, dst in routes.items():
+            self.data[src][dst] = (src, dst)
+
+    def where(self, l):
+        result = next(i for i in l if l is not None)
+        print (result)
+
+    def permutation(self):
+        p0 = BSPMat(int(self.size/2))
+        p1 = BSPMat(int(self.size/2))
+        print (self.data[0])
+        print (self.where(self.data[0]))
+        for c in range(2,self.size,2):
+            print (c)
 
 
 class BSRoute(nx.DiGraph):
@@ -120,9 +144,42 @@ class BSRoute(nx.DiGraph):
         return set([self.node[x]['id'] for x in nx.descendants(self, src) if
                     x[0] == 'N'])
 
+    def partmat(self, m):
+        p1 = m[::2] + m[1::2]
+        return p1[:, ::2] + p1[:, 1::2]
+
+    def decomp(self, m):
+        pi = m.copy()
+        pa = np.zeros_like(m)
+        pb = m.copy()
+        out0 = self.routedst[0]
+        pa[out0/2][0] = 1
+        pi[out0/2][0] -= 1
+        for i in range(1, pa.shape[0]):
+            w = np.where(pi[:, i])[0].item(0)
+            pa[w][i] = 1
+            pb[w][i] -= 1
+        return pa, pb
+
     def gen(self):
         self.routesrc = {a: b for a, b in zip(self.src, self.dst)}
         self.routedst = {b: a for a, b in self.routesrc.items()}
+        wat = BSPMat(len(self.routesrc))
+        wat.preseed(self.routesrc)
+        wat.permutation()
+        print (wat.data)
+        raise NotImplementedError
+        m = np.zeros([self.nports, self.nports], dtype=int)
+        for src, dst in self.routesrc.items():
+            m[src][dst] = 1
+        # print (m[:, ::2])
+        print (m)
+        pm = self.partmat(m)
+        print (pm)
+        pa, pb = self.decomp(pm)
+        print (pa)
+        print (pb)
+        raise NotImplementedError
         self.routeout = {}
         nsw = int(self.nports / 2**self.mbits)
         swk = "L{:d}-S{{:d}}".format(self.stages)
