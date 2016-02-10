@@ -32,25 +32,88 @@ import numpy as np
 
 class BSPMat():
 
-    def __init__(self, size):
-        self.size = size
-        self.data = [[None for x in range(size)] for y in range(size)]
+    def __init__(self, srcdst=None):
+        if srcdst:
+            self.s = {a: {'dst': b, 'os': None, 'od': None} for a, b in srcdst}
+            self.d = {b['dst']: {'src': a, 'os': None, 'od': None} for a, b in
+                      self.s.items()}
+        else:
+            self.s = {}
+            self.d = {}
+        self.calcsize()
 
-    def preseed(self, routes):
-        for src, dst in routes.items():
-            self.data[src][dst] = (src, dst)
-
-    def where(self, l):
-        result = next(i for i in l if l is not None)
-        print (result)
+    def calcsize(self):
+        self.size = len(self.s)
+        assert(self.size == len(self.d))
 
     def permutation(self):
-        p0 = BSPMat(int(self.size/2))
-        p1 = BSPMat(int(self.size/2))
-        print (self.data[0])
-        print (self.where(self.data[0]))
-        for c in range(2,self.size,2):
-            print (c)
+        Pa = BSPMat()
+        Pb = BSPMat()
+        ref = self.d[0]
+        nsrc = int(ref['src']/2)
+        Pa.d[0] = {'src': nsrc, 'os': ref['src'], 'od': 0}
+        Pa.s[nsrc] = {'dst': 0, 'os': ref['src'], 'od': 0}
+        if (ref['src'] & 1):
+            odst = self.s[ref['src'] - 1]['dst']
+        else:
+            odst = self.s[ref['src'] + 1]['dst']
+        ndst = int(odst/2)
+        ref = self.d[odst]
+        nsrc = int(ref['src']/2)
+        Pb.d[ndst] = {'src': nsrc, 'os': ref['src'], 'od': odst}
+        Pb.s[nsrc] = {'dst': ndst, 'os': ref['src'], 'od': odst}
+        ref = self.d[1]
+        nsrc = int(ref['src']/2)
+        Pb.d[0] = {'src': nsrc, 'os': ref['src'], 'od': 1}
+        Pb.s[nsrc] = {'dst': 0, 'os': ref['src'], 'od': 1}
+        if (ref['src'] & 1):
+            odst = self.s[ref['src'] - 1]['dst']
+        else:
+            odst = self.s[ref['src'] + 1]['dst']
+        ndst = int(odst/2)
+        ref = self.d[odst]
+        nsrc = int(ref['src']/2)
+        Pa.d[ndst] = {'src': nsrc, 'os': ref['src'], 'od': odst}
+        Pa.s[nsrc] = {'dst': ndst, 'os': ref['src'], 'od': odst}
+        for i in range(1, int(self.size/2)):
+            ci = [i * 2, i * 2 + 1]
+            ci = [x for x in ci if self.d[x]['src'] not in Pa.s and
+                  self.d[x]['src'] not in Pb.s]
+            refs = sorted([self.d[x] for x in ci], key=lambda x: x['src'])
+            if len(refs) > 0:
+                tgt = refs.pop(0)
+                newsrc = int(tgt['src']/2)
+                Pa.d[i] = {'src': newsrc, 'os': tgt['src'], 'od':
+                           self.s[tgt['src']]['dst']}
+                Pa.s[newsrc] = {'dst': i, 'os': tgt['src'], 'od':
+                                Pa.d[i]['od']}
+            if len(refs) > 0:
+                tgt = refs.pop(0)
+                newsrc = int(tgt['src']/2)
+                Pb.d[i] = {'src': newsrc, 'os': tgt['src'], 'od':
+                           self.s[tgt['src']]['dst']}
+                Pb.s[newsrc] = {'dst': i, 'os': tgt['src'], 'od':
+                                Pb.d[i]['od']}
+        print (Pa.d)
+        print (Pa.s)
+        Pa.calcsize()
+        Pb.calcsize()
+        print(Pa.d)
+        return Pa, Pb
+
+    def __repr__(self):
+        l = [[0 for x in range(self.size)] for y in range(self.size)]
+        maxlen = 0
+        for k, v in self.s.items():
+            if v['os']:
+                d = (v['os'], v['od'])
+            else:
+                d = 1
+            maxlen = max(maxlen, len(str(d)))
+            l[k][v['dst']] = d
+        fmt = "{{:{:d}}}".format(maxlen)
+        st = [list(map(lambda x: fmt.format(x), y)) for y in l]
+        return str(st).replace('],','],\n').replace("'",'')
 
 
 class BSRoute(nx.DiGraph):
@@ -148,27 +211,19 @@ class BSRoute(nx.DiGraph):
         p1 = m[::2] + m[1::2]
         return p1[:, ::2] + p1[:, 1::2]
 
-    def decomp(self, m):
-        pi = m.copy()
-        pa = np.zeros_like(m)
-        pb = m.copy()
-        out0 = self.routedst[0]
-        pa[out0/2][0] = 1
-        pi[out0/2][0] -= 1
-        for i in range(1, pa.shape[0]):
-            w = np.where(pi[:, i])[0].item(0)
-            pa[w][i] = 1
-            pb[w][i] -= 1
+    def decomp(self, src, dst):
+        print (dst[0])
+        pa, pb = {}, {}
         return pa, pb
 
     def gen(self):
-        self.routesrc = {a: b for a, b in zip(self.src, self.dst)}
-        self.routedst = {b: a for a, b in self.routesrc.items()}
-        wat = BSPMat(len(self.routesrc))
-        wat.preseed(self.routesrc)
-        wat.permutation()
-        print (wat.data)
-        raise NotImplementedError
+        Pa = BSPMat(zip(self.src, self.dst))
+        print (Pa)
+        while (Pa.size > 1):
+            Pa, Pb = Pa.permutation()
+            print (Pa)
+            print (Pb)
+            raise NotImplementedError
         m = np.zeros([self.nports, self.nports], dtype=int)
         for src, dst in self.routesrc.items():
             m[src][dst] = 1
