@@ -28,6 +28,7 @@ import parse
 import math
 import networkx as nx
 import numpy as np
+import time
 
 
 class BSPMat():
@@ -41,12 +42,14 @@ class BSPMat():
         else:
             self.s = {}
             self.d = {}
+            self.size = None
+
+    def __len__(self):
+        return self.size
 
     def insert(self, x):
         newsrc = int(x['src']/2)
         newdst = int(x['dst']/2)
-        print ("Inserting ({}, {}) to ({}, {})".format(x['src'], x['dst'],
-                                                       newsrc, newdst))
         v = {'src': newsrc, 'dst': newdst, 'os': x['src'], 'od': x['dst']}
         self.s[newsrc] = v
         self.d[newdst] = v
@@ -54,8 +57,6 @@ class BSPMat():
     def delete(self, x):
         newsrc = int(x['src']/2)
         newdst = int(x['dst']/2)
-        print ("Deleting ({}, {}) from ({}, {})".format(x['src'], x['dst'],
-                                                        newsrc, newdst))
         del self.ps[newsrc][x['src']]
         if len(self.ps[newsrc]) == 0:
             del self.ps[newsrc]
@@ -96,38 +97,43 @@ class BSPMat():
                 Pb.insert(v)
                 self.delete(v)
                 others -= 2
-            start = next(iter(self.pd))
+            if len(self.pd):
+                start = next(iter(self.pd))
+            else:
+                start = None
         return start, others
-    
+
     def newpermute(self, r):
         """
             We hit the end of a cycle without completing the permutation.
             Find a new starting point
         """
         return next(iter(r))
-        
 
     def permutation(self):
         Pa, Pb = BSPMat(), BSPMat()
         startcol, othercols = self.permutedbl(Pa, Pb)
-        v = next(iter(self.pd[startcol].values()))
-        Pa.insert(v)
-        pos = int(v['dst']/2)
-        self.delete(v)
-        reflu = [self.pd, self.ps]
-        refin = [Pb, Pa]
-        refdim = ['dst', 'src']
-        refidx = 0
-        for i in range(othercols):
-            refl = reflu[refidx]
-            refi = refin[refidx]
-            if pos not in refl:
-                pos = self.newpermute(refl)
-            refidx = (refidx + 1) % 2
-            v = next(iter(refl[pos].values()))
-            refi.insert(v)
-            pos = int(v[refdim[refidx]]/2)
+        if startcol is not None:
+            v = next(iter(self.pd[startcol].values()))
+            Pa.insert(v)
+            pos = int(v['dst']/2)
             self.delete(v)
+            reflu = [self.pd, self.ps]
+            refin = [Pb, Pa]
+            refdim = ['dst', 'src']
+            refidx = 0
+            for i in range(othercols):
+                refl = reflu[refidx]
+                refi = refin[refidx]
+                if pos not in refl:
+                    pos = self.newpermute(refl)
+                refidx = (refidx + 1) % 2
+                v = next(iter(refl[pos].values()))
+                refi.insert(v)
+                pos = int(v[refdim[refidx]]/2)
+                self.delete(v)
+        Pa.size = len(Pa.d)
+        Pb.size = len(Pb.d)
         return Pa, Pb
 
 
@@ -146,9 +152,7 @@ class BSRoute(nx.DiGraph):
         self.mbits = int(math.log(pr[2], 2))
         self.stages = pr[3]
         self.rbits = self.stages*self.nbits*2 + self.mbits
-        self.buildgraph(netfile)
         netfile.close()
-        # print (self.nports, self.nbits, self.mbits)
         self.src = []
         self.dst = []
         if len(route) > 0:
@@ -161,41 +165,6 @@ class BSRoute(nx.DiGraph):
         self.dupecheck(self.dst)
         self.rangecheck(self.src)
         self.rangecheck(self.dst)
-        return
-
-    def buildgraph(self, netfile):
-        cp = parse.compile(
-            r"\draw(r{:d}-{:d}-{:w}-{:d})--(r{:d}-{:d}-{:w}-{:d}{}")
-        l = netfile.readline().strip()
-        while l:
-            pr = [x for x in cp.parse(l)][:8]
-            fromkey = "L{:d}-S{:d}".format(*map(lambda x: x-1, pr[:2]))
-            fromport = pr[3]-1
-            tokey = "L{:d}-S{:d}".format(*map(lambda x: x-1, pr[4:6]))
-            toport = pr[7]-1
-            if pr[2] == 'input':
-                fromkey, tokey = tokey, fromkey
-                fromport, toport = toport, fromport
-            self.add_node(fromkey)
-            self.add_node(tokey)
-            self.add_edge(fromkey, tokey, {'srcp': fromport, 'dstp': toport})
-            l = netfile.readline().strip()
-        switch = 0
-        port = 0
-        nports = 2**self.nbits
-        for i in range(self.nports):
-            srckey = "N{:d}-src".format(i)
-            dstkey = "N{:d}-dst".format(i)
-            self.add_node(srckey, {'id': i})
-            self.add_node(dstkey, {'id': i})
-            swtokey = "L{:d}-S{:d}".format(0, switch)
-            swfromkey = "L{:d}-S{:d}".format(self.stages*2, switch)
-            self.add_edge(srckey, swtokey, {'dstp': port})
-            self.add_edge(swfromkey, dstkey, {'srcp': port})
-            port += 1
-            if port == nports:
-                switch += 1
-                port = 0
         return
 
     def rangeraise(self, v):
@@ -218,91 +187,25 @@ class BSRoute(nx.DiGraph):
         self.src = random.sample(range(self.nports), self.nports)
         self.dst = random.sample(range(self.nports), self.nports)
 
-    def descendant_endpoints(self, src):
-        return set([self.node[x]['id'] for x in nx.descendants(self, src) if
-                    x[0] == 'N'])
-
-    def partmat(self, m):
-        p1 = m[::2] + m[1::2]
-        return p1[:, ::2] + p1[:, 1::2]
-
-    def decomp(self, src, dst):
-        print (dst[0])
-        pa, pb = {}, {}
-        return pa, pb
-
     def gen(self):
         # self.src = [2, 4, 7, 5, 1, 3, 6, 0]
         # self.src = [7, 3, 5, 1, 6, 2, 0, 4]
         # self.src = [7, 0, 4, 5, 1, 2, 6, 3]
-        self.src = [7, 6, 4, 5, 1, 2, 0, 3]
-        self.dst = [0, 1, 2, 3, 4, 5, 6, 7]
+        # self.src = [7, 6, 4, 5, 1, 2, 0, 3]
+        # self.dst = [0, 1, 2, 3, 4, 5, 6, 7]
         Pa = BSPMat(zip(self.src, self.dst))
-        print (Pa.d)
-        Pa.partition().permutation()
-        raise NotImplementedError
-        while (Pa.size > 1):
-            Pa, Pb = Pa.permutation()
-            print (Pa)
-            print (Pb)
-            raise NotImplementedError
-        m = np.zeros([self.nports, self.nports], dtype=int)
-        for src, dst in self.routesrc.items():
-            m[src][dst] = 1
-        # print (m[:, ::2])
-        print (m)
-        pm = self.partmat(m)
-        print (pm)
-        pa, pb = self.decomp(pm)
-        print (pa)
-        print (pb)
-        raise NotImplementedError
-        self.routeout = {}
-        nsw = int(self.nports / 2**self.mbits)
-        swk = "L{:d}-S{{:d}}".format(self.stages)
-        sw = 0
-        target = self.nports
-        while len(self.routeout) != target:
-            sw = (sw + 1) % nsw
-            mid = swk.format(sw)
-            routable = self.descendant_endpoints(mid)
-            isec = routable.intersection(self.routedst.keys())
-            spath = None
-            for dst in isec:
-                src = self.routedst[dst]
-                skey = "N{:d}-src".format(src)
-                try:
-                    spath = nx.shortest_path(self, skey, mid)
-                except nx.exception.NetworkXNoPath:
-                    continue
-                break
-            if spath is None:
-                target -= 1
-                continue
-                raise KeyError(spath, "Invalid path {}".format(spath))
-            # print ("Route found from {:d}--{:d}".format(src,dst))
-            dkey = "N{:d}-dst".format(dst)
-            dpath = nx.shortest_path(self, mid, dkey)
-            path = spath + dpath[1:]
-            routebits = 0
-            for i in range(2, len(path)):
-                if i == self.stages:
-                    bitshift = self.mbits
-                else:
-                    bitshift = self.nbits
-                routebits <<= bitshift
-                routebits |= self.edge[path[i-1]][path[i]]['srcp']
-                self.remove_edge(path[i-1], path[i])
-            self.routeout[src] = routebits
-            # print (src, dst, "{:05b}".format(routebits))
-            del self.routesrc[src]
-            del self.routedst[dst]
-        print ("Routed {:d}/{:d} ({:.2f}%) connections".format(
-            len(self.routeout), self.nports,
-            float(len(self.routeout))/self.nports * 100))
+        while len(Pa) > 1:
+            Pa, Pb = Pa.partition().permutation()
+            isw = [x['os'] for x in Pa.d.values() if x['os'] & 1]
+            osw = [x['od'] for x in Pa.d.values() if x['od'] & 1]
+            # print ("In:", isw)
+            # print ("Out:", osw)
 
 
 if __name__ == "__main__":
     ARGS = docopt(__doc__, version="Banyan Static Router v0.0")
     BSR = BSRoute(ARGS['<network.tikz>'], ARGS['<src--dst>'])
+    start = time.clock()
     BSR.gen()
+    end = time.clock()
+    print ("Routed permutation in {:.4f} seconds".format(end - start))
