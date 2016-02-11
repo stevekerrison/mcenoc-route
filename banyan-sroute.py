@@ -34,86 +34,101 @@ class BSPMat():
 
     def __init__(self, srcdst=None):
         if srcdst:
-            self.s = {a: {'dst': b, 'os': None, 'od': None} for a, b in srcdst}
-            self.d = {b['dst']: {'src': a, 'os': None, 'od': None} for a, b in
-                      self.s.items()}
+            self.s = {a: {'src': a, 'dst': b, 'os': None, 'od': None} for a, b
+                      in srcdst}
+            self.d = {b['dst']: b for a, b in self.s.items()}
+            self.size = len(self.s)
         else:
             self.s = {}
             self.d = {}
-        self.calcsize()
 
-    def calcsize(self):
-        self.size = len(self.s)
-        assert(self.size == len(self.d))
+    def insert(self, x):
+        newsrc = int(x['src']/2)
+        newdst = int(x['dst']/2)
+        print ("Inserting ({}, {}) to ({}, {})".format(x['src'], x['dst'],
+                                                       newsrc, newdst))
+        v = {'src': newsrc, 'dst': newdst, 'os': x['src'], 'od': x['dst']}
+        self.s[newsrc] = v
+        self.d[newdst] = v
+
+    def delete(self, x):
+        newsrc = int(x['src']/2)
+        newdst = int(x['dst']/2)
+        print ("Deleting ({}, {}) from ({}, {})".format(x['src'], x['dst'],
+                                                        newsrc, newdst))
+        del self.ps[newsrc][x['src']]
+        if len(self.ps[newsrc]) == 0:
+            del self.ps[newsrc]
+        del self.pd[newdst][x['dst']]
+        if len(self.pd[newdst]) == 0:
+            del self.pd[newdst]
+        return
+
+    def partition(self):
+        newsize = int(self.size/2)
+        self.ps = {x: {} for x in range(newsize)}
+        self.pd = {x: {} for x in range(newsize)}
+        self.dbl = {}
+        seen = {}
+        for x in self.d.values():
+            ns = int(x['src']/2)
+            nd = int(x['dst']/2)
+            self.ps[ns][x['src']] = x
+            self.pd[nd][x['dst']] = x
+            if (ns, nd) in seen:
+                self.dbl[ns, nd] = True
+            else:
+                seen[ns, nd] = True
+        return self
+
+    def permutedbl(self, Pa, Pb):
+        """
+            Do the permutation splitting for cells that have two entries
+        """
+        start = 0
+        others = self.size - 1
+        if len(self.dbl):
+            for x in self.dbl:
+                v = next(iter(self.pd[x[1]].values()))
+                Pa.insert(v)
+                self.delete(v)
+                v = next(iter(self.pd[x[1]].values()))
+                Pb.insert(v)
+                self.delete(v)
+                others -= 2
+            start = next(iter(self.pd))
+        return start, others
+    
+    def newpermute(self, r):
+        """
+            We hit the end of a cycle without completing the permutation.
+            Find a new starting point
+        """
+        return next(iter(r))
+        
 
     def permutation(self):
-        Pa = BSPMat()
-        Pb = BSPMat()
-        ref = self.d[0]
-        nsrc = int(ref['src']/2)
-        Pa.d[0] = {'src': nsrc, 'os': ref['src'], 'od': 0}
-        Pa.s[nsrc] = {'dst': 0, 'os': ref['src'], 'od': 0}
-        if (ref['src'] & 1):
-            odst = self.s[ref['src'] - 1]['dst']
-        else:
-            odst = self.s[ref['src'] + 1]['dst']
-        ndst = int(odst/2)
-        ref = self.d[odst]
-        nsrc = int(ref['src']/2)
-        Pb.d[ndst] = {'src': nsrc, 'os': ref['src'], 'od': odst}
-        Pb.s[nsrc] = {'dst': ndst, 'os': ref['src'], 'od': odst}
-        ref = self.d[1]
-        nsrc = int(ref['src']/2)
-        Pb.d[0] = {'src': nsrc, 'os': ref['src'], 'od': 1}
-        Pb.s[nsrc] = {'dst': 0, 'os': ref['src'], 'od': 1}
-        if (ref['src'] & 1):
-            odst = self.s[ref['src'] - 1]['dst']
-        else:
-            odst = self.s[ref['src'] + 1]['dst']
-        ndst = int(odst/2)
-        ref = self.d[odst]
-        nsrc = int(ref['src']/2)
-        Pa.d[ndst] = {'src': nsrc, 'os': ref['src'], 'od': odst}
-        Pa.s[nsrc] = {'dst': ndst, 'os': ref['src'], 'od': odst}
-        for i in range(1, int(self.size/2)):
-            ci = [i * 2, i * 2 + 1]
-            ci = [x for x in ci if self.d[x]['src'] not in Pa.s and
-                  self.d[x]['src'] not in Pb.s]
-            refs = sorted([self.d[x] for x in ci], key=lambda x: x['src'])
-            if len(refs) > 0:
-                tgt = refs.pop(0)
-                newsrc = int(tgt['src']/2)
-                Pa.d[i] = {'src': newsrc, 'os': tgt['src'], 'od':
-                           self.s[tgt['src']]['dst']}
-                Pa.s[newsrc] = {'dst': i, 'os': tgt['src'], 'od':
-                                Pa.d[i]['od']}
-            if len(refs) > 0:
-                tgt = refs.pop(0)
-                newsrc = int(tgt['src']/2)
-                Pb.d[i] = {'src': newsrc, 'os': tgt['src'], 'od':
-                           self.s[tgt['src']]['dst']}
-                Pb.s[newsrc] = {'dst': i, 'os': tgt['src'], 'od':
-                                Pb.d[i]['od']}
-        print (Pa.d)
-        print (Pa.s)
-        Pa.calcsize()
-        Pb.calcsize()
-        print(Pa.d)
+        Pa, Pb = BSPMat(), BSPMat()
+        startcol, othercols = self.permutedbl(Pa, Pb)
+        v = next(iter(self.pd[startcol].values()))
+        Pa.insert(v)
+        pos = int(v['dst']/2)
+        self.delete(v)
+        reflu = [self.pd, self.ps]
+        refin = [Pb, Pa]
+        refdim = ['dst', 'src']
+        refidx = 0
+        for i in range(othercols):
+            refl = reflu[refidx]
+            refi = refin[refidx]
+            if pos not in refl:
+                pos = self.newpermute(refl)
+            refidx = (refidx + 1) % 2
+            v = next(iter(refl[pos].values()))
+            refi.insert(v)
+            pos = int(v[refdim[refidx]]/2)
+            self.delete(v)
         return Pa, Pb
-
-    def __repr__(self):
-        l = [[0 for x in range(self.size)] for y in range(self.size)]
-        maxlen = 0
-        for k, v in self.s.items():
-            if v['os']:
-                d = (v['os'], v['od'])
-            else:
-                d = 1
-            maxlen = max(maxlen, len(str(d)))
-            l[k][v['dst']] = d
-        fmt = "{{:{:d}}}".format(maxlen)
-        st = [list(map(lambda x: fmt.format(x), y)) for y in l]
-        return str(st).replace('],','],\n').replace("'",'')
 
 
 class BSRoute(nx.DiGraph):
@@ -217,8 +232,15 @@ class BSRoute(nx.DiGraph):
         return pa, pb
 
     def gen(self):
+        # self.src = [2, 4, 7, 5, 1, 3, 6, 0]
+        # self.src = [7, 3, 5, 1, 6, 2, 0, 4]
+        # self.src = [7, 0, 4, 5, 1, 2, 6, 3]
+        self.src = [7, 6, 4, 5, 1, 2, 0, 3]
+        self.dst = [0, 1, 2, 3, 4, 5, 6, 7]
         Pa = BSPMat(zip(self.src, self.dst))
-        print (Pa)
+        print (Pa.d)
+        Pa.partition().permutation()
+        raise NotImplementedError
         while (Pa.size > 1):
             Pa, Pb = Pa.permutation()
             print (Pa)
