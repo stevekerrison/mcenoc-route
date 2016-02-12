@@ -142,8 +142,8 @@ class BSPMat():
         print ("Out:", osw)
         stage -= 1
         if stage >= 0:
-            Pa.permutation(stage, offset)
-            Pb.permutation(stage, offset+1)
+            Pa.permutation(stage, 2*offset)
+            Pb.permutation(stage, 2*offset+1)
 
     def route(self):
         return [(x, y['dst']) for x, y in self.s.items()]
