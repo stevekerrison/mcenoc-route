@@ -29,6 +29,7 @@ import math
 import networkx as nx
 import numpy as np
 import time
+import sys
 
 
 class BSPMat():
@@ -160,6 +161,7 @@ class BSRoute(nx.DiGraph):
             self.src = list(map(lambda i: int(i, 0), src))
             self.dst = list(map(lambda i: int(i, 0), dst))
         else:
+            print ("No route given. Generating random route", file=sys.stderr)
             self.randroute()
         self.dupecheck(self.src)
         self.dupecheck(self.dst)
@@ -208,4 +210,5 @@ if __name__ == "__main__":
     start = time.clock()
     BSR.gen()
     end = time.clock()
-    print ("Routed permutation in {:.4f} seconds".format(end - start))
+    print ("Routed permutation in {:.4f} seconds".format(end - start),
+           file=sys.stderr)
