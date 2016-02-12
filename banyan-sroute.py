@@ -110,7 +110,7 @@ class BSPMat():
         """
         return next(iter(r))
 
-    def permutation(self, stage):
+    def permutation(self, stage, offset=0):
         self.partition()
         Pa, Pb = BSPMat(), BSPMat()
         startcol, othercols = self.permutedbl(Pa, Pb)
@@ -137,13 +137,13 @@ class BSPMat():
         Pb.size = len(Pb.d)
         isw = [int(x['os']/2) for x in Pa.d.values() if x['os'] & 1]
         osw = [int(x['od']/2) for x in Pa.d.values() if x['od'] & 1]
-        print ("Stage: {}", stage)
+        print ("Stage: {},{}".format(stage, offset))
         print ("In:", isw)
         print ("Out:", osw)
         stage -= 1
         if stage >= 0:
-            Pa.permutation(stage)
-            Pb.permutation(stage)
+            Pa.permutation(stage, offset)
+            Pb.permutation(stage, offset+1)
 
     def route(self):
         return [(x, y['dst']) for x, y in self.s.items()]
@@ -208,6 +208,8 @@ class BSRoute():
         # self.src = [7, 0, 4, 5, 1, 2, 6, 3]
         # self.src = [7, 6, 4, 5, 1, 2, 0, 3]
         # self.dst = [0, 1, 2, 3, 4, 5, 6, 7]
+        # self.src = [0, 1, 2, 3, 4, 5, 6, 7]
+        # self.dst = [7, 3, 6, 0, 5, 2, 1, 4]
         Pa = BSPMat(zip(self.src, self.dst))
         Pb = None
         # print (Pa.route())
