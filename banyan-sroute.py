@@ -26,7 +26,6 @@ from docopt import docopt
 import random
 import parse
 import math
-import networkx as nx
 import numpy as np
 import time
 import sys
@@ -111,7 +110,8 @@ class BSPMat():
         """
         return next(iter(r))
 
-    def permutation(self):
+    def permutation(self, stage):
+        self.partition()
         Pa, Pb = BSPMat(), BSPMat()
         startcol, othercols = self.permutedbl(Pa, Pb)
         if startcol is not None:
@@ -135,10 +135,21 @@ class BSPMat():
                 self.delete(v)
         Pa.size = len(Pa.d)
         Pb.size = len(Pb.d)
-        return Pa, Pb
+        isw = [int(x['os']/2) for x in Pa.d.values() if x['os'] & 1]
+        osw = [int(x['od']/2) for x in Pa.d.values() if x['od'] & 1]
+        print ("Stage: {}", stage)
+        print ("In:", isw)
+        print ("Out:", osw)
+        stage -= 1
+        if stage >= 0:
+            Pa.permutation(stage)
+            Pb.permutation(stage)
+
+    def route(self):
+        return [(x, y['dst']) for x, y in self.s.items()]
 
 
-class BSRoute(nx.DiGraph):
+class BSRoute():
     """
         Static route generator for Banyan-style networks.
     """
@@ -189,6 +200,8 @@ class BSRoute(nx.DiGraph):
         self.src = random.sample(range(self.nports), self.nports)
         self.dst = random.sample(range(self.nports), self.nports)
 
+
+
     def gen(self):
         # self.src = [2, 4, 7, 5, 1, 3, 6, 0]
         # self.src = [7, 3, 5, 1, 6, 2, 0, 4]
@@ -196,12 +209,11 @@ class BSRoute(nx.DiGraph):
         # self.src = [7, 6, 4, 5, 1, 2, 0, 3]
         # self.dst = [0, 1, 2, 3, 4, 5, 6, 7]
         Pa = BSPMat(zip(self.src, self.dst))
-        while len(Pa) > 1:
-            Pa, Pb = Pa.partition().permutation()
-            isw = [x['os'] for x in Pa.d.values() if x['os'] & 1]
-            osw = [x['od'] for x in Pa.d.values() if x['od'] & 1]
-            # print ("In:", isw)
-            # print ("Out:", osw)
+        Pb = None
+        # print (Pa.route())
+        stage = int(math.log(self.nports,2))-1
+        Pa.permutation(stage)
+
 
 
 if __name__ == "__main__":
