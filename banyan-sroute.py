@@ -137,7 +137,7 @@ class BSPMat():
         Pb.size = len(Pb.d)
         isw = [int(x['os']/2) for x in Pa.d.values() if x['os'] & 1]
         osw = [int(x['od']/2) for x in Pa.d.values() if x['od'] & 1]
-        swconfig = {(stage,offset): {'in': isw, 'out': osw}}
+        swconfig = {(stage, offset): {'in': isw, 'out': osw}}
         stage -= 1
         offset *= 2
         if stage >= 0:
@@ -200,7 +200,14 @@ class BSRoute():
         self.src = random.sample(range(self.nports), self.nports)
         self.dst = random.sample(range(self.nports), self.nports)
 
-
+    def routebits(self):
+        rbits = [[] for x in range(self.nports)]
+        nstages = int(math.log(self.nports, 2) - 1)
+        stages = list(range(nstages,0,-1)) + list(range(nstages+1))
+        print (rbits)
+        for st in stages:
+            for sw in range(int(self.nports/2)):
+                pass
 
     def gen(self):
         # self.src = [2, 4, 7, 5, 1, 3, 6, 0]
@@ -213,10 +220,10 @@ class BSRoute():
         Pa = BSPMat(zip(self.src, self.dst))
         Pb = None
         print (Pa.route())
-        stage = int(math.log(self.nports,2))-1
-        swconfig = Pa.permutation(stage)
-        print (swconfig)
-
+        stage = int(math.log(self.nports, 2))-1
+        self.swconfig = Pa.permutation(stage)
+        print (self.swconfig)
+        self.routebits()
 
 
 if __name__ == "__main__":
