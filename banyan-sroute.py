@@ -137,13 +137,13 @@ class BSPMat():
         Pb.size = len(Pb.d)
         isw = [int(x['os']/2) for x in Pa.d.values() if x['os'] & 1]
         osw = [int(x['od']/2) for x in Pa.d.values() if x['od'] & 1]
-        print ("Stage: {},{}".format(stage, offset))
-        print ("In:", isw)
-        print ("Out:", osw)
+        swconfig = {(stage,offset): {'in': isw, 'out': osw}}
         stage -= 1
+        offset *= 2
         if stage >= 0:
-            Pa.permutation(stage, 2*offset)
-            Pb.permutation(stage, 2*offset+1)
+            swconfig.update(Pa.permutation(stage, offset))
+            swconfig.update(Pb.permutation(stage, offset+1))
+        return swconfig
 
     def route(self):
         return [(x, y['dst']) for x, y in self.s.items()]
@@ -212,9 +212,10 @@ class BSRoute():
         # self.dst = [7, 3, 6, 0, 5, 2, 1, 4]
         Pa = BSPMat(zip(self.src, self.dst))
         Pb = None
-        # print (Pa.route())
+        print (Pa.route())
         stage = int(math.log(self.nports,2))-1
-        Pa.permutation(stage)
+        swconfig = Pa.permutation(stage)
+        print (swconfig)
 
 
 
