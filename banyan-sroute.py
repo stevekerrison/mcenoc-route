@@ -206,12 +206,13 @@ class BSRoute():
         stages = list(range(nstages, 0, -1)) + list(range(nstages+1))
         steps = [2*(stages[0] - n) for n in stages]
         side = ['in' for x in range(nstages+1)] + ['out' for x in
-                                                        range(nstages)]
+                                                   range(nstages)]
         print (side)
-        inputs = list(range(self.nports))
+        inputs = {x: x for x in range(self.nports)}
         print (rbits, stages, steps)
         for i, st in enumerate(stages):
             print (steps[i])
+            newinputs = {x: False for x in range(self.nports)}
             for sw in range(int(self.nports/2)):
                 mod = 2**st
                 relsw = sw % mod
@@ -220,6 +221,45 @@ class BSRoute():
                 cfg = self.swconfig[context]
                 cross = relsw in cfg[side[i]]
                 print (relsw, context, cross)
+                p0 = 2*sw
+                p1 = 2*sw+1
+                if cross:
+                    rbits[inputs[p0]].append(1)
+                    rbits[inputs[p1]].append(0)
+                else:
+                    rbits[inputs[p0]].append(0)
+                    rbits[inputs[p1]].append(1)
+                if side[i] == 'in':
+                    pass
+                elif i+1 < len(stages):
+                    # Only go as far as penultimate stage
+                    pstep = 2**(st+2)
+                    if pstep > self.nports:
+                        step = self.nports
+                    else:
+                        step = pstep
+                    pmap = int((p0 % step) * 2)
+                    wrapcount = int(pmap / step)
+                    pmod = int((pmap % step) + wrapcount)
+                    blockoff = int(math.floor(p0 / step) * step)
+                    fport = pmod + blockoff
+                    newinputs[fport] = inputs[p0]
+                    print (
+                        "pstep: {}, step: {}, wc: {}, pm: {}, bo: {}".format(
+                            pstep, step, wrapcount, pmod, blockoff))
+                    print ("{} -> {}".format(p0, fport))
+                    pmap = int((p1 % step) * 2) 
+                    wrapcount = int(pmap / step)
+                    pmod = int((pmap % step) + wrapcount)
+                    blockoff = int(math.floor(p1 / step) * step)
+                    fport = pmod + blockoff
+                    newinputs[fport] = inputs[p1]
+                    print (
+                        "pstep: {}, step: {}, wc: {}, pm: {}, bo: {}".format(
+                            pstep, step, wrapcount, pmod, blockoff))
+                    print ("{} -> {}".format(p1, fport))
+            inputs = dict(newinputs)
+        print (rbits)
 
     def gen(self):
         # self.src = [2, 4, 7, 5, 1, 3, 6, 0]
