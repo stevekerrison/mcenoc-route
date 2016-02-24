@@ -137,7 +137,7 @@ class BSPMat():
         Pb.size = len(Pb.d)
         isw = [int(x['os']/2) for x in Pa.d.values() if x['os'] & 1]
         osw = [int(x['od']/2) for x in Pa.d.values() if x['od'] & 1]
-        swconfig = {(stage, offset): {'in': isw, 'out': osw}}
+        swconfig = {(stage, offset): {'in': set(isw), 'out': set(osw)}}
         stage -= 1
         offset *= 2
         if stage >= 0:
@@ -203,11 +203,23 @@ class BSRoute():
     def routebits(self):
         rbits = [[] for x in range(self.nports)]
         nstages = int(math.log(self.nports, 2) - 1)
-        stages = list(range(nstages,0,-1)) + list(range(nstages+1))
-        print (rbits)
-        for st in stages:
+        stages = list(range(nstages, 0, -1)) + list(range(nstages+1))
+        steps = [2*(stages[0] - n) for n in stages]
+        side = ['in' for x in range(nstages+1)] + ['out' for x in
+                                                        range(nstages)]
+        print (side)
+        inputs = list(range(self.nports))
+        print (rbits, stages, steps)
+        for i, st in enumerate(stages):
+            print (steps[i])
             for sw in range(int(self.nports/2)):
-                pass
+                mod = 2**st
+                relsw = sw % mod
+                group = max(int(self.nports/2) - steps[i], 1)
+                context = (st, int(sw/group))
+                cfg = self.swconfig[context]
+                cross = relsw in cfg[side[i]]
+                print (relsw, context, cross)
 
     def gen(self):
         # self.src = [2, 4, 7, 5, 1, 3, 6, 0]
@@ -215,11 +227,11 @@ class BSRoute():
         # self.src = [7, 0, 4, 5, 1, 2, 6, 3]
         # self.src = [7, 6, 4, 5, 1, 2, 0, 3]
         # self.dst = [0, 1, 2, 3, 4, 5, 6, 7]
-        # self.src = [0, 1, 2, 3, 4, 5, 6, 7]
-        # self.dst = [7, 3, 6, 0, 5, 2, 1, 4]
+        self.src = [0, 1, 2, 3, 4, 5, 6, 7]
+        self.dst = [7, 3, 6, 0, 5, 2, 1, 4]
         Pa = BSPMat(zip(self.src, self.dst))
         Pb = None
-        print (Pa.route())
+        # print (Pa.route())
         stage = int(math.log(self.nports, 2))-1
         self.swconfig = Pa.permutation(stage)
         print (self.swconfig)
