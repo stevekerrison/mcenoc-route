@@ -228,6 +228,7 @@ class BSRoute():
         self.inputs = {x: x for x in range(self.nports)}
         newinputs = {x: False for x in range(self.nports)}
         for i, st in enumerate(stages):
+            print (st)
             newinputs = {x: False for x in range(self.nports)}
             for sw in range(int(self.nports/2)):
                 mod = 2**st
@@ -254,7 +255,10 @@ class BSRoute():
             if i+1 < len(stages):
                 for p in range(self.nports):
                     # Only go as far as penultimate stage
-                    pstep = 2**(st+1)
+                    if side[i+1] == 'in':
+                        pstep = 2**(st+1)
+                    else:
+                        pstep = 2**(st+2)
                     if pstep > self.nports:
                         step = self.nports
                     else:
