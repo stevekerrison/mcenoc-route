@@ -228,7 +228,7 @@ class BSRoute():
         self.inputs = {x: x for x in range(self.nports)}
         newinputs = {x: False for x in range(self.nports)}
         for i, st in enumerate(stages):
-            print (st)
+            # print (st)
             newinputs = {x: False for x in range(self.nports)}
             for sw in range(int(self.nports/2)):
                 mod = 2**st
@@ -281,14 +281,17 @@ class BSRoute():
         # self.src = [7, 0, 4, 5, 1, 2, 6, 3]
         # self.src = [7, 6, 4, 5, 1, 2, 0, 3]
         # self.dst = [0, 1, 2, 3, 4, 5, 6, 7]
-        self.src = [0, 1, 2, 3, 4, 5, 6, 7]
-        self.dst = [7, 3, 6, 0, 5, 2, 1, 4]
+        # self.src = [0, 1, 2, 3, 4, 5, 6, 7]
+        # self.dst = [7, 3, 6, 0, 5, 2, 1, 4]
+        self.src = list(range(16))
+        self.dst = [0, 11, 2, 7, 14, 8, 5, 6, 3, 10, 13, 4, 12, 1, 9, 15]
         Pa = BSPMat(zip(self.src, self.dst))
         Pb = None
-        # print (Pa.route())
+        print (Pa.route())
         stage = int(math.log(self.nports, 2))-1
         self.swconfig = Pa.permutation(stage)
-        print (self.swconfig)
+        confkey = sorted(self.swconfig, reverse=True)
+        print ([(k, self.swconfig[k]) for k in confkey])
         self.routebits()
 
 
