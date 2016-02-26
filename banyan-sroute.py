@@ -219,22 +219,23 @@ class BSRoute():
         fport = pmod + blockoff
 
     def routebits(self):
-        rbits = [[] for x in range(self.nports)]
+        rbits = {x: [] for x in range(self.nports)}
         nstages = int(math.log(self.nports, 2) - 1)
         stages = list(range(nstages, 0, -1)) + list(range(nstages+1))
+        linkstages = stages[1:nstages+1]
+        linkstages += reversed(linkstages)
         steps = [2*(stages[0] - n) for n in stages]
         side = ['in' for x in range(nstages+1)] + ['out' for x in
                                                    range(nstages)]
         self.inputs = {x: x for x in range(self.nports)}
         newinputs = {x: False for x in range(self.nports)}
         for i, st in enumerate(stages):
-            # print (st)
             newinputs = {x: False for x in range(self.nports)}
             for sw in range(int(self.nports/2)):
                 mod = 2**st
                 relsw = sw % mod
-                group = max(int(self.nports/2) - steps[i], 1)
-                context = (st, int(sw/group))
+                group = int(sw/mod)
+                context = (st, group)
                 cfg = self.swconfig[context]
                 cross = relsw in cfg[side[i]]
                 p0 = 2*sw
@@ -250,19 +251,15 @@ class BSRoute():
                     rbits[self.inputs[p1]].append(1)
                     newinputs[p1] = self.inputs[p1]
             self.inputs = dict(newinputs)
-            print ("Out: ", self.inputs)
             newinputs = {x: False for x in range(self.nports)}
             if i+1 < len(stages):
+                pstep = 2**(linkstages[i]+2)
+                if pstep > self.nports:
+                    step = self.nports
+                else:
+                    step = pstep
                 for p in range(self.nports):
                     # Only go as far as penultimate stage
-                    if side[i+1] == 'in':
-                        pstep = 2**(st+1)
-                    else:
-                        pstep = 2**(st+2)
-                    if pstep > self.nports:
-                        step = self.nports
-                    else:
-                        step = pstep
                     pmap = int((p % step) * 2)
                     wrapcount = int(pmap / step)
                     pmod = int((pmap % step) + wrapcount)
@@ -272,8 +269,7 @@ class BSRoute():
                         p, fport = fport, p
                     newinputs[fport] = self.inputs[p]
                 self.inputs = dict(newinputs)
-                print ("In:  ", self.inputs)
-        print (rbits)
+        return rbits
 
     def gen(self):
         # self.src = [2, 4, 7, 5, 1, 3, 6, 0]
@@ -283,16 +279,18 @@ class BSRoute():
         # self.dst = [0, 1, 2, 3, 4, 5, 6, 7]
         # self.src = [0, 1, 2, 3, 4, 5, 6, 7]
         # self.dst = [7, 3, 6, 0, 5, 2, 1, 4]
-        self.src = list(range(16))
-        self.dst = [0, 11, 2, 7, 14, 8, 5, 6, 3, 10, 13, 4, 12, 1, 9, 15]
+        # self.src = list(range(16))
+        # self.dst = [0, 11, 2, 7, 14, 8, 5, 6, 3, 10, 13, 4, 12, 1, 9, 15]
         Pa = BSPMat(zip(self.src, self.dst))
         Pb = None
-        print (Pa.route())
+        print ("Route:")
+        print (Pa.route)
         stage = int(math.log(self.nports, 2))-1
         self.swconfig = Pa.permutation(stage)
         confkey = sorted(self.swconfig, reverse=True)
-        print ([(k, self.swconfig[k]) for k in confkey])
-        self.routebits()
+        # print ([(k, self.swconfig[k]) for k in confkey])
+        print ("Route bits per port:")
+        print (self.routebits())
 
 
 if __name__ == "__main__":
