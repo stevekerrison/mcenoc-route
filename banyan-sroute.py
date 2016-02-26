@@ -284,7 +284,7 @@ class BSRoute():
         Pa = BSPMat(zip(self.src, self.dst))
         Pb = None
         print ("Route:")
-        print (Pa.route)
+        print (Pa.route())
         stage = int(math.log(self.nports, 2))-1
         self.swconfig = Pa.permutation(stage)
         confkey = sorted(self.swconfig, reverse=True)
