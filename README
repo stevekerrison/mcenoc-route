@@ -9,5 +9,8 @@ network images used in this tool. See https://github.com/stevekerrison/Sa-TikZ
 The location of this TikZ library must be in your TEXINPUTS envvar in order to
 run pdflatex/similar.
 
+The routing algorithm is based on the work of A. Waksman, "A Permutation
+Network," Journal of the ACM, vol. 15, pp. 159–163, Jan. 1968.
+
 This work is Copyright (c) 2017 Steve Kerrison, University of Bristol, and
 distributed under an MIT License. See the LICENSE file for more information.
