@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 """
-    Banyan Static Router
+    Static Router for MCENoC network
 
     Generates headers for a set of static routes of 2-party calls
-    in a UoB Banyan-style network of switches. Provided no two sources
+    in a UoB MCENoC network of switches. Provided no two sources
     require the same destination, a valid non-blocking route is guaranteed.
 
+    Copyright (c) 2017 Steve Kerrison, University of Bristol
+
+    Released under the MIT License, see LICENSE file, which must be packaged
+    together with this program wherever it is distributed.
+
 Usage:
-    banyan-sroute.py -h
-    banyan-sroute.py <network.tikz> [<src--dst>...]
+    mcenoc-sroute.py -h
+    mcenoc-sroute.py [options] <network.tikz> [<src--dst>...]
 
 Options:
     -h, --help                      Print this help message.
+    -a <file.tikz> --annotate=<file.tikz>   Output coloured routes.
+    -p, --print                     Print routing bits for each port.
 
 Arguments:
     <network.tikz>                  The network description in Sa-Tikz
@@ -151,20 +158,20 @@ class BSPMat():
 
 class BSRoute():
     """
-        Static route generator for Banyan-style networks.
+        Static route generator for MCENoC networks.
     """
 
     def __init__(self, net, route):
         super(BSRoute, self).__init__()
-        netfile = open(net, 'r')
+        self.netfile = open(net, 'r')
         pr = parse.parse(r"\node[BP={:d}, BN={:d}, BM={:d}, BL={:d}{}",
-                         netfile.readline().strip())
+                         self.netfile.readline().strip())
         self.nports = pr[0]
         self.nbits = int(math.log(pr[1], 2))
         self.mbits = int(math.log(pr[2], 2))
         self.stages = pr[3]
         self.rbits = self.stages*self.nbits*2 + self.mbits
-        netfile.close()
+        self.netfile.seek(0, 0)
         self.src = []
         self.dst = []
         if len(route) > 0:
@@ -218,7 +225,29 @@ class BSRoute():
         blockoff = int(math.floor(port / step) * step)
         fport = pmod + blockoff
 
-    def routebits(self):
+    def routebits(self, annotate):
+        if annotate:
+            f = open(annotate, 'w')
+            f.write(r"""\documentclass[tikz]{standalone}
+\usepackage{xcolor}
+
+\newcommand{\randomcolor}{%
+  \definecolor{randomcolor}{RGB}
+   {
+    \pdfuniformdeviate 256,
+    \pdfuniformdeviate 256,
+    \pdfuniformdeviate 256
+   }%
+  \color{randomcolor}%
+}
+\usetikzlibrary{switching-architectures}
+\pagestyle{empty}
+
+\begin{document}
+
+\begin{tikzpicture}
+""")
+            f.write(self.netfile.read())
         rbits = {x: [] for x in range(self.nports)}
         nstages = int(math.log(self.nports, 2) - 1)
         stages = list(range(nstages, 0, -1)) + list(range(nstages+1))
@@ -245,11 +274,25 @@ class BSRoute():
                     newinputs[p0+1] = self.inputs[p0]
                     rbits[self.inputs[p1]].append(0)
                     newinputs[p1-1] = self.inputs[p1]
+                    if annotate:
+                        f.write("""
+\draw[color=blue,densely dotted,thick](r{}-{}-input-{})--(r{}-{}-output-{});""".format(
+                            i+1, sw+1, 1, i+1, sw+1, 2))
+                        f.write("""
+\draw[color=blue,densely dotted,thick](r{}-{}-input-{})--(r{}-{}-output-{});""".format(
+                            i+1, sw+1, 2, i+1, sw+1, 1))
                 else:
                     rbits[self.inputs[p0]].append(0)
                     newinputs[p0] = self.inputs[p0]
                     rbits[self.inputs[p1]].append(1)
                     newinputs[p1] = self.inputs[p1]
+                    if annotate:
+                        f.write("""
+\draw[color=blue,densely dotted,thick](r{}-{}-input-{})--(r{}-{}-output-{});""".format(
+                            i+1, sw+1, 1, i+1, sw+1, 1))
+                        f.write("""
+\draw[color=blue,densely dotted,thick](r{}-{}-input-{})--(r{}-{}-output-{});""".format(
+                        i+1, sw+1, 2, i+1, sw+1, 2))
             self.inputs = dict(newinputs)
             newinputs = {x: False for x in range(self.nports)}
             if i+1 < len(stages):
@@ -269,9 +312,15 @@ class BSRoute():
                         p, fport = fport, p
                     newinputs[fport] = self.inputs[p]
                 self.inputs = dict(newinputs)
+        if annotate:
+            f.write(r"""
+\end{tikzpicture}
+
+\end{document}""")
+            f.close()
         return rbits
 
-    def gen(self):
+    def gen(self, annotate, printroute):
         # self.src = [2, 4, 7, 5, 1, 3, 6, 0]
         # self.src = [7, 3, 5, 1, 6, 2, 0, 4]
         # self.src = [7, 0, 4, 5, 1, 2, 6, 3]
@@ -283,21 +332,22 @@ class BSRoute():
         # self.dst = [0, 11, 2, 7, 14, 8, 5, 6, 3, 10, 13, 4, 12, 1, 9, 15]
         Pa = BSPMat(zip(self.src, self.dst))
         Pb = None
-        print ("Route:")
-        print (Pa.route())
+        # print ("Route:")
+        # print (Pa.route())
         stage = int(math.log(self.nports, 2))-1
         self.swconfig = Pa.permutation(stage)
         confkey = sorted(self.swconfig, reverse=True)
         # print ([(k, self.swconfig[k]) for k in confkey])
-        print ("Route bits per port:")
-        print (self.routebits())
+        if printroute:
+            print ("Route bits per port:")
+            print (self.routebits(annotate))
 
 
 if __name__ == "__main__":
-    ARGS = docopt(__doc__, version="Banyan Static Router v0.0")
+    ARGS = docopt(__doc__, version="MCENoC Static Router v0.1")
     BSR = BSRoute(ARGS['<network.tikz>'], ARGS['<src--dst>'])
     start = time.clock()
-    BSR.gen()
+    BSR.gen(ARGS['--annotate'], ARGS['--print'])
     end = time.clock()
     print ("Routed permutation in {:.4f} seconds".format(end - start),
            file=sys.stderr)

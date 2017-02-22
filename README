@@ -1,2 +1,13 @@
-A static routing algorithm for the Banyan networks implemented by UoB on the
-EMC2 project.
+A static routing algorithm for MCENoC networks implemented by UoB on the EMC2
+project.
+
+See the --help for details on running the program.
+
+A modified Sa-TikZ library, *switching-architectures* is used to generate the
+network images used in this tool. See https://github.com/stevekerrison/Sa-TikZ
+
+The location of this TikZ library must be in your TEXINPUTS envvar in order to
+run pdflatex/similar.
+
+This work is Copyright (c) 2017 Steve Kerrison, University of Bristol, and
+distributed under an MIT License. See the LICENSE file for more information.
