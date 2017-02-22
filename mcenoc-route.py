@@ -2,9 +2,9 @@
 """
     Static Router for MCENoC network
 
-    Generates headers for a set of static routes of 2-party calls
-    in a UoB MCENoC network of switches. Provided no two sources
-    require the same destination, a valid non-blocking route is guaranteed.
+    Generates headers for a set of static routes of 2-party calls in a UoB
+    MCENoC network of switches. Provided no two sources require the same
+    destination, a valid non-blocking route is guaranteed.
 
     Copyright (c) 2017 Steve Kerrison, University of Bristol
 
