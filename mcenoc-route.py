@@ -179,7 +179,7 @@ class BSRoute():
             self.src = list(map(lambda i: int(i, 0), src))
             self.dst = list(map(lambda i: int(i, 0), dst))
         else:
-            print ("No route given. Generating random route", file=sys.stderr)
+            print("No route given. Generating random route", file=sys.stderr)
             self.randroute()
         self.dupecheck(self.src)
         self.dupecheck(self.dst)
@@ -275,24 +275,28 @@ class BSRoute():
                     rbits[self.inputs[p1]].append(0)
                     newinputs[p1-1] = self.inputs[p1]
                     if annotate:
-                        f.write("""
-\draw[color=blue,densely dotted,thick](r{}-{}-input-{})--(r{}-{}-output-{});""".format(
-                            i+1, sw+1, 1, i+1, sw+1, 2))
-                        f.write("""
-\draw[color=blue,densely dotted,thick](r{}-{}-input-{})--(r{}-{}-output-{});""".format(
-                            i+1, sw+1, 2, i+1, sw+1, 1))
+                        f.write(
+                            "\n\draw[color=blue,densely dotted,thick]" +
+                            "(r{}-{}-input-{})--(r{}-{}-output-{});".format(
+                                i+1, sw+1, 1, i+1, sw+1, 2))
+                        f.write(
+                            "\n\draw[color=blue,densely dotted,thick]" +
+                            "(r{}-{}-input-{})--(r{}-{}-output-{});".format(
+                                i+1, sw+1, 2, i+1, sw+1, 1))
                 else:
                     rbits[self.inputs[p0]].append(0)
                     newinputs[p0] = self.inputs[p0]
                     rbits[self.inputs[p1]].append(1)
                     newinputs[p1] = self.inputs[p1]
                     if annotate:
-                        f.write("""
-\draw[color=blue,densely dotted,thick](r{}-{}-input-{})--(r{}-{}-output-{});""".format(
-                            i+1, sw+1, 1, i+1, sw+1, 1))
-                        f.write("""
-\draw[color=blue,densely dotted,thick](r{}-{}-input-{})--(r{}-{}-output-{});""".format(
-                        i+1, sw+1, 2, i+1, sw+1, 2))
+                        f.write(
+                            "\n\draw[color=blue,densely dotted,thick]" +
+                            "(r{}-{}-input-{})--(r{}-{}-output-{});".format(
+                                i+1, sw+1, 1, i+1, sw+1, 1))
+                        f.write(
+                            "\n\draw[color=blue,densely dotted,thick]" +
+                            "(r{}-{}-input-{})--(r{}-{}-output-{});".format(
+                                i+1, sw+1, 2, i+1, sw+1, 2))
             self.inputs = dict(newinputs)
             newinputs = {x: False for x in range(self.nports)}
             if i+1 < len(stages):
@@ -339,8 +343,8 @@ class BSRoute():
         confkey = sorted(self.swconfig, reverse=True)
         # print ([(k, self.swconfig[k]) for k in confkey])
         if printroute:
-            print ("Route bits per port:")
-            print (self.routebits(annotate))
+            print("Route bits per port:")
+            print(self.routebits(annotate))
 
 
 if __name__ == "__main__":
@@ -349,5 +353,5 @@ if __name__ == "__main__":
     start = time.clock()
     BSR.gen(ARGS['--annotate'], ARGS['--print'])
     end = time.clock()
-    print ("Routed permutation in {:.4f} seconds".format(end - start),
-           file=sys.stderr)
+    print("Routed permutation in {:.4f} seconds".format(end - start),
+          file=sys.stderr)
